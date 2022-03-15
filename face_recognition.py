@@ -24,6 +24,23 @@ countFrame = 20
 serverName = "autodoor.herokuapp.com"
 
 
+def responseSever(serverName, message):
+    """ Connect to server """
+    ws = create_connection("ws://" + str(serverName))
+
+    """ Send data to the server """
+    print("Sending...")
+    ws.send(message)
+    print("Sent")
+
+    """ Receive message from server """
+    # print("Receiving...")
+    # result = ws.recv()
+    # print("Received '%s'" % result)
+
+    ws.close()
+
+
 def FrameCount(Frames, serverName, message):
     average = 0.00
     total = 0.00
@@ -32,20 +49,9 @@ def FrameCount(Frames, serverName, message):
     average = total/countFrame
     if((average) >= 0.8 and len(Frames) == countFrame):
         print("Average accuracy: {:.3f}%".format(average*100))
-        """ Connect to server """
-        ws = create_connection("ws://" + str(serverName))
-
-        """ Send data to the server """
-        print("Sending...")
-        ws.send(message)
-        print("Sent")
-
-        """ Receive message from server """
-        # print("Receiving...")
-        # result = ws.recv()
-        # print("Received '%s'" % result)
-
-        ws.close()
+        responseSeverThr = threading.Thread(
+            target=responseSever, args=[serverName, message])
+        responseSeverThr.start()
 
 
 def fancyDraw(img, bbox, l=30, t=3, rt=1):
@@ -79,12 +85,12 @@ with tf.Graph().as_default():
         gpu_options=gpu_options, log_device_placement=False))
     with sess.as_default():
         pnet, rnet, onet = detect_face.create_mtcnn(sess, npy)
-        minsize = 30  # minimum size of face
-        threshold = [0.8, 0.8, 0.8]  # three step's threshold
-        factor = 0.709  # scale factor
+        minsize = 30
+        threshold = [0.7, 0.7, 0.7]
+        factor = 0.709
         margin = 44
         batch_size = 1000
-        image_size = 182
+        image_size = 500
         input_image_size = 160
         HumanNames = os.listdir(train_img)
         HumanNames.sort()
@@ -159,13 +165,13 @@ with tf.Graph().as_default():
                         best_class_probabilities = predictions[np.arange(
                             len(best_class_indices)), best_class_indices]
 
-                        if best_class_probabilities > 0.87:
+                        if best_class_probabilities > 0.93:
                             fancyDraw(frame, bbox)
                             for H_i in HumanNames:
                                 if HumanNames[best_class_indices[0]] == H_i:
                                     result_names = HumanNames[best_class_indices[0]]
 
-                                    print("Predictions : [ name: {} , accuracy: {:.3f} ]".format(
+                                    print(i, " --Predictions : [ name: {} , accuracy: {:.3f} ]".format(
                                         HumanNames[best_class_indices[0]], best_class_probabilities[0]))
 
                                     Frames.append({
