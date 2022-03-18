@@ -75,7 +75,7 @@ with tf.Graph().as_default():
     with sess.as_default():
         pnet, rnet, onet = detect_face.create_mtcnn(sess, npy)
         minsize = 30
-        threshold = [0.7, 0.8, 0.8]
+        threshold = [0.8, 0.8, 0.8]
         factor = 0.709
         margin = 44
         batch_size = 1000
