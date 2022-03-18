@@ -22,6 +22,9 @@ serverName = "autodoor.herokuapp.com"
 link_list = []
 node_size = 10
 temp = 0
+result_names = ""
+bounding_boxes = np.ndarray((0, ))
+key_points = np.ndarray((0, ))
 
 
 def responseSever(serverName, message):
@@ -41,6 +44,33 @@ def responseSever(serverName, message):
     ws.close()
 
 
+def countHumanName(Frames):
+    Name = Frames[0][0]
+    print(Name)
+    check = True
+    for Frame in Frames:
+        if Frame[0] == Name:
+            Name = Frame[0]
+        else:
+            check = False
+            break
+    return check
+
+
+def Detect(frame, minsize, pnet, rnet, onet, threshold, factor):
+    global bounding_boxes, key_points
+    bounding_boxes, key_points = detect_face.detect_face(
+        frame, minsize, pnet, rnet, onet, threshold, factor)
+    print(key_points, "\n")
+    return bounding_boxes, key_points
+
+
+def Predictions(emb_array):
+    global predictions
+    predictions = model.predict_proba(emb_array)
+    return predictions
+
+
 def AccuracyStatistics(Nodes):
     count = 0
     for Node in Nodes:
@@ -49,22 +79,24 @@ def AccuracyStatistics(Nodes):
     return count
 
 
-def fancy_draw(img, bbox, l=30, t=3, rt=1):
+def fancy_draw(img, bbox, l=5, t=3, rt=1):
     xmin, ymin, xmax, ymax = bbox
+    w = xmax - xmin
+    h = ymax - ymin
     # Bounding box
     cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 255, 0), rt)
     # Top Left  x,y
-    cv2.line(img, (xmin, ymin), (xmin + l, ymin), (0, 255, 0), t)
-    cv2.line(img, (xmin, ymin), (xmin, ymin + l), (0, 255, 0), t)
+    cv2.line(img, (xmin, ymin), (xmin + int(w/l), ymin), (0, 255, 0), t)
+    cv2.line(img, (xmin, ymin), (xmin, ymin + int(h/l)), (0, 255, 0), t)
     # Top Right  x_max,y
-    cv2.line(img, (xmax, ymin), (xmax - l, ymin), (0, 255, 0), t)
-    cv2.line(img, (xmax, ymin), (xmax, ymin + l), (0, 255, 0), t)
+    cv2.line(img, (xmax, ymin), (xmax - int(w/l), ymin), (0, 255, 0), t)
+    cv2.line(img, (xmax, ymin), (xmax, ymin + int(h/l)), (0, 255, 0), t)
     # Bottom Left  x,y_max
-    cv2.line(img, (xmin, ymax), (xmin + l, ymax), (0, 255, 0), t)
-    cv2.line(img, (xmin, ymax), (xmin, ymax - l), (0, 255, 0), t)
+    cv2.line(img, (xmin, ymax), (xmin + int(w/l), ymax), (0, 255, 0), t)
+    cv2.line(img, (xmin, ymax), (xmin, ymax - int(h/l)), (0, 255, 0), t)
     # Bottom Right  x_max,y_max
-    cv2.line(img, (xmax, ymax), (xmax - l, ymax), (0, 255, 0), t)
-    cv2.line(img, (xmax, ymax), (xmax, ymax - l), (0, 255, 0), t)
+    cv2.line(img, (xmax, ymax), (xmax - int(w/l), ymax), (0, 255, 0), t)
+    cv2.line(img, (xmax, ymax), (xmax, ymax - int(h/l)), (0, 255, 0), t)
     return img
 
 
@@ -75,10 +107,9 @@ with tf.Graph().as_default():
     with sess.as_default():
         pnet, rnet, onet = detect_face.create_mtcnn(sess, npy)
         minsize = 30
-        threshold = [0.8, 0.8, 0.8]
+        threshold = [0.7, 0.75, 0.8]
         factor = 0.709
-        margin = 44
-        batch_size = 1000
+        margin = 100
         image_size = 182
         input_image_size = 160
         HumanNames = os.listdir(train_img)
@@ -100,8 +131,9 @@ with tf.Graph().as_default():
             timer = time.time()
             if frame.ndim == 2:
                 frame = facenet.to_rgb(frame)
-            bounding_boxes, _ = detect_face.detect_face(
-                frame, minsize, pnet, rnet, onet, threshold, factor)
+            Thr_1 = threading.Thread(target=Detect, args=(
+                frame, minsize, pnet, rnet, onet, threshold, factor))
+            Thr_1.start()
             faceNum = bounding_boxes.shape[0]
             if faceNum > 0:
                 det = bounding_boxes[:, 0:4]
@@ -116,10 +148,25 @@ with tf.Graph().as_default():
                     xmax = int(det[i][2])
                     ymax = int(det[i][3])
                     bbox = xmin, ymin, xmax, ymax
+                    cv2.circle(frame, (int(key_points[0][0]), int(
+                        key_points[5][0])), 2, (0, 0, 255), -1)
+                    cv2.circle(frame, (int(key_points[1][0]), int(
+                        key_points[6][0])), 2, (0, 0, 255), -1)
+                    cv2.circle(frame, (int(key_points[2][0]), int(
+                        key_points[7][0])), 2, (0, 0, 255), -1)
+                    cv2.circle(frame, (int(key_points[3][0]), int(
+                        key_points[8][0])), 2, (0, 0, 255), -1)
+                    cv2.circle(frame, (int(key_points[4][0]), int(
+                        key_points[9][0])), 2, (0, 0, 255), -1)
                     try:
-                        if xmin <= 0 or ymin <= 0 or xmax >= len(frame[0]) or ymax >= len(frame):
+                        if xmin < 0 or ymin < 0 or xmax > len(frame[0]) or ymax > len(frame):
                             print('Face is very close!')
                             continue
+                        if xmin == 0 or ymin == 0 or xmax == len(frame[0]) or ymax == len(frame):
+                            print('Loading...')
+                            continue
+                        best_class_indices = np.ndarray((1,))
+                        best_class_probabilities = np.ndarray((1,))
                         cropped.append(frame[ymin:ymax, xmin:xmax, :])
                         cropped[i] = facenet.flip(cropped[i], False)
                         scaled.append(np.array(Image.fromarray(
@@ -137,7 +184,9 @@ with tf.Graph().as_default():
                         best_class_indices = np.argmax(predictions, axis=1)
                         best_class_probabilities = predictions[np.arange(
                             len(best_class_indices)), best_class_indices]
-                        fancy_draw(frame, bbox)
+                        Thr_2 = threading.Thread(
+                            target=fancy_draw, args=(frame, bbox))
+                        Thr_2.start()
                         if best_class_probabilities > 0.80:
                             if faceNum != temp:
                                 temp = faceNum
@@ -150,26 +199,26 @@ with tf.Graph().as_default():
                                 [HumanNames[best_class_indices[0]], best_class_probabilities])
                             link_list[i] = link_list[i][-node_size:]
                             print(link_list)
-                            result_names = ""
                             if AccuracyStatistics(link_list[i]) >= (node_size*(80/100)):
-                                result_names = HumanNames[best_class_indices[0]]
+                                print(countHumanName(link_list[i]))
+                                result_names = link_list[best_class_indices[0]][0][0]
                             else:
                                 result_names = "Unknown"
-                            cv2.rectangle(frame, (xmin, ymin - 30),
-                                          (xmax, ymin - 10), (0, 255, 0), -1)
-                            cv2.putText(frame, result_names, (xmin, ymin - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL,
-                                        1, (0, 0, 0), thickness=1, lineType=1)
+
                         else:
-                            cv2.rectangle(frame, (xmin, ymin - 30),
-                                          (xmax, ymin - 10), (0, 255, 0), -1)
-                            cv2.putText(frame, "Unknown", (xmin, ymin - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL,
-                                        1, (0, 0, 0), thickness=1, lineType=1)
+                            result_names = "Unknown"
+                        cv2.rectangle(frame, (xmin, ymin - 30),
+                                      (xmax, ymin - 10), (0, 255, 0), -1)
+                        cv2.putText(frame, result_names, (xmin, ymin - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                                    1, (0, 0, 0), thickness=1, lineType=1)
                     except Exception as e:
                         print("Error: ", e)
             else:
                 temp = 0
             endtimer = time.time()
-            fps = 1 / (endtimer - timer)
+            fps = 0.00
+            if (endtimer - timer) != 0:
+                fps = 1 / (endtimer - timer)
             cv2.putText(frame, "Fps: {:.2f}".format(
                 fps), (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 1)
             cv2.imshow('Face Recognition', frame)
