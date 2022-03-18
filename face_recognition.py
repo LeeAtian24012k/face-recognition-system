@@ -10,19 +10,16 @@ import time
 import pickle
 from PIL import Image
 import tensorflow.compat.v1 as tf
-# from websocket import create_connection
+from websocket import create_connection
 import threading
 
 video = 0
 modeldir = './model/20180402-114759.pb'
 classifier_filename = './class/classifier.pkl'
 npy = './npy'
-train_img = "./train_img"
+aligned_img = "./aligned_img"
 serverName = "autodoor.herokuapp.com"
-link_list = []
-node_size = 10
-temp = 0
-result_names = ""
+
 
 
 def responseSever(serverName, message):
@@ -42,7 +39,7 @@ def responseSever(serverName, message):
     ws.close()
 
 
-def countHumanName(Frames):
+def CountHumanName(Frames):
     global check
     Name = Frames[0][0]
     for Frame in Frames:
@@ -58,7 +55,6 @@ def Detect(frame, minsize, pnet, rnet, onet, threshold, factor):
     global bounding_boxes, key_points
     bounding_boxes, key_points = detect_face.detect_face(
         frame, minsize, pnet, rnet, onet, threshold, factor)
-    # print(key_points,"\n")
     return bounding_boxes, key_points
 
 
@@ -113,7 +109,11 @@ with tf.Graph().as_default():
         key_points = np.ndarray((0, ))
         count = 0
         check = True
-        HumanNames = os.listdir(train_img)
+        link_list = []
+        node_size = 10
+        temp = 0
+        result_names = ""
+        HumanNames = os.listdir(aligned_img)
         HumanNames.sort()
         print('Loading Model')
         facenet.load_model(modeldir)
@@ -121,6 +121,7 @@ with tf.Graph().as_default():
         embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
         phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
         embedding_size = embeddings.get_shape()[1]
+        print()
         classifier_filename_exp = os.path.expanduser(classifier_filename)
         with open(classifier_filename_exp, 'rb') as infile:
             (model, class_names) = pickle.load(infile, encoding='latin1')
@@ -174,11 +175,7 @@ with tf.Graph().as_default():
                             images_placeholder: scaled_reshape[i], phase_train_placeholder: False}
                         emb_array[0, :] = sess.run(
                             embeddings, feed_dict=feed_dict)
-                        # predictions = model.predict_proba(emb_array)
-                        predictions = np.ndarray((1,))
-                        Thr = threading.Thread(target=Predictions, args=(emb_array,))
-                        Thr.start()
-                        Thr.join()
+                        predictions = model.predict_proba(emb_array)
                         best_class_indices = np.argmax(predictions, axis=1)
                         best_class_probabilities = predictions[np.arange(
                             len(best_class_indices)), best_class_indices]
@@ -191,7 +188,7 @@ with tf.Graph().as_default():
                                 link_list = []
                                 for j in range(0, faceNum):
                                     link_list.append([])
-                            print("Num face: ", len(link_list))
+                            print("---------------------------------------------\nNum face: ", len(link_list))
                             print('Position: ', i)
                             link_list[i].append(
                                 [HumanNames[best_class_indices[0]], best_class_probabilities])
@@ -202,11 +199,11 @@ with tf.Graph().as_default():
                                 Thr_3 = threading.Thread(target=AccuracyStatistics, args=(link_list[i],))
                                 Thr_3.start()
                                 Thr_3.join()
-                                Thr_4 = threading.Thread(target=countHumanName, args=(link_list[i],))
+                                Thr_4 = threading.Thread(target=CountHumanName, args=(link_list[i],))
                                 Thr_4.start()
                                 Thr_4.join()
+                                print("One label: ",check)
                                 if count >= (node_size*(80/100)) and check == True:
-                                    print(countHumanName(link_list[i]), '\n')
                                     result_names = HumanNames[best_class_indices[0]]
                                 else:
                                     result_names = "Unknown"
@@ -221,6 +218,7 @@ with tf.Graph().as_default():
                         print("Error: ", e)
             else:
                 temp = 0
+                link_list = []
             endtimer = time.time()
             fps = 0.00
             if (endtimer - timer) != 0:
