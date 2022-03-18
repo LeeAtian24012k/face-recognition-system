@@ -46,7 +46,6 @@ def responseSever(serverName, message):
 
 def countHumanName(Frames):
     Name = Frames[0][0]
-    print(Name)
     check = True
     for Frame in Frames:
         if Frame[0] == Name:
@@ -61,7 +60,7 @@ def Detect(frame, minsize, pnet, rnet, onet, threshold, factor):
     global bounding_boxes, key_points
     bounding_boxes, key_points = detect_face.detect_face(
         frame, minsize, pnet, rnet, onet, threshold, factor)
-    print(key_points, "\n")
+    # print(key_points,"\n")
     return bounding_boxes, key_points
 
 
@@ -74,7 +73,7 @@ def Predictions(emb_array):
 def AccuracyStatistics(Nodes):
     count = 0
     for Node in Nodes:
-        if Node[1] >= 0.85:
+        if Node[1] >= 0.88:
             count += 1
     return count
 
@@ -134,6 +133,7 @@ with tf.Graph().as_default():
             Thr_1 = threading.Thread(target=Detect, args=(
                 frame, minsize, pnet, rnet, onet, threshold, factor))
             Thr_1.start()
+            # bounding_boxes, key_points = detect_face.detect_face(frame, minsize, pnet, rnet, onet, threshold, factor)
             faceNum = bounding_boxes.shape[0]
             if faceNum > 0:
                 det = bounding_boxes[:, 0:4]
@@ -148,25 +148,18 @@ with tf.Graph().as_default():
                     xmax = int(det[i][2])
                     ymax = int(det[i][3])
                     bbox = xmin, ymin, xmax, ymax
-                    cv2.circle(frame, (int(key_points[0][0]), int(
-                        key_points[5][0])), 2, (0, 0, 255), -1)
-                    cv2.circle(frame, (int(key_points[1][0]), int(
-                        key_points[6][0])), 2, (0, 0, 255), -1)
-                    cv2.circle(frame, (int(key_points[2][0]), int(
-                        key_points[7][0])), 2, (0, 0, 255), -1)
-                    cv2.circle(frame, (int(key_points[3][0]), int(
-                        key_points[8][0])), 2, (0, 0, 255), -1)
-                    cv2.circle(frame, (int(key_points[4][0]), int(
-                        key_points[9][0])), 2, (0, 0, 255), -1)
                     try:
+                        # cv2.circle(frame, (int(key_points[0][i]), int(key_points[5][i])), 2, (0,0,255), -1)
+                        # cv2.circle(frame, (int(key_points[1][i]), int(key_points[6][i])), 2, (0,0,255), -1)
+                        # cv2.circle(frame, (int(key_points[2][i]), int(key_points[7][i])), 2, (0,0,255), -1)
+                        # cv2.circle(frame, (int(key_points[3][i]), int(key_points[8][i])), 2, (0,0,255), -1)
+                        # cv2.circle(frame, (int(key_points[4][i]), int(key_points[9][i])), 2, (0,0,255), -1)
                         if xmin < 0 or ymin < 0 or xmax > len(frame[0]) or ymax > len(frame):
                             print('Face is very close!')
                             continue
                         if xmin == 0 or ymin == 0 or xmax == len(frame[0]) or ymax == len(frame):
                             print('Loading...')
                             continue
-                        best_class_indices = np.ndarray((1,))
-                        best_class_probabilities = np.ndarray((1,))
                         cropped.append(frame[ymin:ymax, xmin:xmax, :])
                         cropped[i] = facenet.flip(cropped[i], False)
                         scaled.append(np.array(Image.fromarray(
@@ -191,17 +184,17 @@ with tf.Graph().as_default():
                             if faceNum != temp:
                                 temp = faceNum
                                 link_list = []
-                                for i in range(0, faceNum):
+                                for j in range(0, faceNum):
                                     link_list.append([])
-                            print(len(link_list), '\n')
-                            print('i: ', i)
+                            print("Num face: ", len(link_list))
+                            print('Position: ', i)
                             link_list[i].append(
                                 [HumanNames[best_class_indices[0]], best_class_probabilities])
                             link_list[i] = link_list[i][-node_size:]
-                            print(link_list)
+                            print(link_list[i], '\n')
                             if AccuracyStatistics(link_list[i]) >= (node_size*(80/100)):
                                 print(countHumanName(link_list[i]))
-                                result_names = link_list[best_class_indices[0]][0][0]
+                                result_names = HumanNames[best_class_indices[0]]
                             else:
                                 result_names = "Unknown"
 
