@@ -10,7 +10,7 @@ import time
 import pickle
 from PIL import Image
 import tensorflow.compat.v1 as tf
-from websocket import create_connection
+# from websocket import create_connection
 import threading
 
 video = 0
@@ -23,8 +23,6 @@ link_list = []
 node_size = 10
 temp = 0
 result_names = ""
-bounding_boxes = np.ndarray((0, ))
-key_points = np.ndarray((0, ))
 
 
 def responseSever(serverName, message):
@@ -45,8 +43,8 @@ def responseSever(serverName, message):
 
 
 def countHumanName(Frames):
+    global check
     Name = Frames[0][0]
-    check = True
     for Frame in Frames:
         if Frame[0] == Name:
             Name = Frame[0]
@@ -71,9 +69,9 @@ def Predictions(emb_array):
 
 
 def AccuracyStatistics(Nodes):
-    count = 0
+    global count
     for Node in Nodes:
-        if Node[1] >= 0.88:
+        if Node[1] >= 0.93:
             count += 1
     return count
 
@@ -111,6 +109,10 @@ with tf.Graph().as_default():
         margin = 100
         image_size = 182
         input_image_size = 160
+        bounding_boxes = np.ndarray((0, ))
+        key_points = np.ndarray((0, ))
+        count = 0
+        check = True
         HumanNames = os.listdir(train_img)
         HumanNames.sort()
         print('Loading Model')
@@ -133,7 +135,6 @@ with tf.Graph().as_default():
             Thr_1 = threading.Thread(target=Detect, args=(
                 frame, minsize, pnet, rnet, onet, threshold, factor))
             Thr_1.start()
-            # bounding_boxes, key_points = detect_face.detect_face(frame, minsize, pnet, rnet, onet, threshold, factor)
             faceNum = bounding_boxes.shape[0]
             if faceNum > 0:
                 det = bounding_boxes[:, 0:4]
@@ -157,7 +158,7 @@ with tf.Graph().as_default():
                         if xmin < 0 or ymin < 0 or xmax > len(frame[0]) or ymax > len(frame):
                             print('Face is very close!')
                             continue
-                        if xmin == 0 or ymin == 0 or xmax == len(frame[0]) or ymax == len(frame):
+                        if xmin == 0 and ymin == 0 and xmax == len(frame[0]) and ymax == len(frame):
                             print('Loading...')
                             continue
                         cropped.append(frame[ymin:ymax, xmin:xmax, :])
@@ -173,14 +174,18 @@ with tf.Graph().as_default():
                             images_placeholder: scaled_reshape[i], phase_train_placeholder: False}
                         emb_array[0, :] = sess.run(
                             embeddings, feed_dict=feed_dict)
-                        predictions = model.predict_proba(emb_array)
+                        # predictions = model.predict_proba(emb_array)
+                        predictions = np.ndarray((1,))
+                        Thr = threading.Thread(target=Predictions, args=(emb_array,))
+                        Thr.start()
+                        Thr.join()
                         best_class_indices = np.argmax(predictions, axis=1)
                         best_class_probabilities = predictions[np.arange(
                             len(best_class_indices)), best_class_indices]
                         Thr_2 = threading.Thread(
-                            target=fancy_draw, args=(frame, bbox))
+                            target=fancy_draw, args=(frame, bbox,))
                         Thr_2.start()
-                        if best_class_probabilities > 0.80:
+                        if best_class_probabilities > 0.85:
                             if faceNum != temp:
                                 temp = faceNum
                                 link_list = []
@@ -191,12 +196,20 @@ with tf.Graph().as_default():
                             link_list[i].append(
                                 [HumanNames[best_class_indices[0]], best_class_probabilities])
                             link_list[i] = link_list[i][-node_size:]
-                            print(link_list[i], '\n')
-                            if AccuracyStatistics(link_list[i]) >= (node_size*(80/100)):
-                                print(countHumanName(link_list[i]))
-                                result_names = HumanNames[best_class_indices[0]]
-                            else:
-                                result_names = "Unknown"
+                            print(link_list[i])
+                            if len(link_list[i]) == node_size:
+                                print("Node size: ", len(link_list[i]))
+                                Thr_3 = threading.Thread(target=AccuracyStatistics, args=(link_list[i],))
+                                Thr_3.start()
+                                Thr_3.join()
+                                Thr_4 = threading.Thread(target=countHumanName, args=(link_list[i],))
+                                Thr_4.start()
+                                Thr_4.join()
+                                if count >= (node_size*(80/100)) and check == True:
+                                    print(countHumanName(link_list[i]), '\n')
+                                    result_names = HumanNames[best_class_indices[0]]
+                                else:
+                                    result_names = "Unknown"
 
                         else:
                             result_names = "Unknown"
