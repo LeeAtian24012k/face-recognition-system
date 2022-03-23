@@ -101,7 +101,7 @@ with tf.Graph().as_default():
         print('Start Recognition')
         while True:
             ret, frame = video_capture.read()
-            print(frame.shape)
+            # print(frame.shape)
             frame = cv2.flip(frame, 1)
             timer = time.time()
             if frame.ndim == 2:
@@ -149,7 +149,7 @@ with tf.Graph().as_default():
                         right_eye = (key_points[1][0], key_points[6][0])
                         w = Distance(left_eye, right_eye) #distance eyes in image
                         W = 6.3 
-                        f = 540 
+                        f = 636.6
                         d = (W*f)/w #distance from eyes to webcam
                         # Left eye
                         cv2.circle(frame, (int(key_points[0][0]), int(
