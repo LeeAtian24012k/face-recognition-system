@@ -13,7 +13,6 @@ import tensorflow.compat.v1 as tf
 from websocket import create_connection
 import threading
 import math
-import cvzone
 
 video = 0
 modeldir = './model/20180402-114759.pb'
@@ -42,7 +41,7 @@ def responseSever(serverName, message):
 
     ws.close()
 
-def Distance(left_eye, right_eye):
+def Distance_eyes(left_eye, right_eye):
     w = math.sqrt( math.pow((right_eye[0] - left_eye[0]), 2) + math.pow((right_eye[1] - left_eye[1]), 2))
     return w
 
@@ -144,19 +143,19 @@ with tf.Graph().as_default():
                         best_class_probabilities = predictions[np.arange(
                             len(best_class_indices)), best_class_indices]
                         fancy_draw(frame, bbox)
-                        #Distance from eyes to webcam
+                        #Distance_eyes from eyes to webcam
                         left_eye = (key_points[0][0], key_points[5][0])
                         right_eye = (key_points[1][0], key_points[6][0])
-                        w = Distance(left_eye, right_eye) #distance eyes in image
+                        w = Distance_eyes(left_eye, right_eye)
                         W = 6.3 
                         f = 636.6
-                        d = (W*f)/w #distance from eyes to webcam
+                        d = (W*f)/w #Distance_eyes from eyes to webcam
                         # Left eye
-                        cv2.circle(frame, (int(key_points[0][0]), int(
-                            key_points[5][0])), 2, (0, 0, 255), -1)
+                        # cv2.circle(frame, (int(key_points[0][0]), int(
+                        #     key_points[5][0])), 2, (0, 0, 255), -1)
                         # Right eye
-                        cv2.circle(frame, (int(key_points[1][0]), int(
-                            key_points[6][0])), 2, (0, 0, 255), -1)
+                        # cv2.circle(frame, (int(key_points[1][0]), int(
+                        #     key_points[6][0])), 2, (0, 0, 255), -1)
 
                         # cv2.circle(frame, (int(key_points[2][0]), int(
                         #     key_points[7][0])), 2, (0, 0, 255), -1)

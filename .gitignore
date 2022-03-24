@@ -4,3 +4,5 @@ __pycache__
 # train_img
 # cudart64_110.dll
 # nvcuda.dll
+.project
+.pydevproject
