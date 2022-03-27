@@ -102,12 +102,16 @@ with tf.Graph().as_default():
             ret, frame = video_capture.read()
             # print(frame.shape)
             frame = cv2.flip(frame, 1)
+            x, y, z = frame.shape
+            a = round(y/3)
+            bbox_img2 = cv2.rectangle(frame, (a, 0), (2*a, x), (0, 255, 0), 2)
             timer = time.time()
             if frame.ndim == 2:
                 frame = facenet.to_rgb(frame)
             bounding_boxes, key_points = detect_face.detect_face(
                 frame, minsize, pnet, rnet, onet, threshold, factor)
             faceNum = bounding_boxes.shape[0]
+            
             if faceNum > 0:
                 det = bounding_boxes[:, 0:4]
                 img_size = np.asarray(frame.shape)[0:2]
@@ -125,70 +129,73 @@ with tf.Graph().as_default():
                         if xmin <= 0 or ymin <= 0 or xmax >= len(frame[0]) or ymax >= len(frame):
                             print('Face is very close!')
                             continue
-                        cropped.append(frame[ymin:ymax, xmin:xmax, :])
-                        cropped[i] = facenet.flip(cropped[i], False)
-                        scaled.append(np.array(Image.fromarray(
-                            cropped[i]).resize((image_size, image_size))))
-                        scaled[i] = cv2.resize(scaled[i], (input_image_size, input_image_size),
-                                               interpolation=cv2.INTER_CUBIC)
-                        scaled[i] = facenet.prewhiten(scaled[i])
-                        scaled_reshape.append(
-                            scaled[i].reshape(-1, input_image_size, input_image_size, 3))
-                        feed_dict = {
-                            images_placeholder: scaled_reshape[i], phase_train_placeholder: False}
-                        emb_array[0, :] = sess.run(
-                            embeddings, feed_dict=feed_dict)
-                        predictions = model.predict_proba(emb_array)
-                        best_class_indices = np.argmax(predictions, axis=1)
-                        best_class_probabilities = predictions[np.arange(
-                            len(best_class_indices)), best_class_indices]
-                        fancy_draw(frame, bbox)
-                        #Distance_eyes from eyes to webcam
-                        left_eye = (key_points[0][0], key_points[5][0])
-                        right_eye = (key_points[1][0], key_points[6][0])
-                        w = Distance_eyes(left_eye, right_eye)
-                        W = 6.3 
-                        f = 636.6
-                        d = (W*f)/w #Distance_eyes from eyes to webcam
-                        # Left eye
-                        # cv2.circle(frame, (int(key_points[0][0]), int(
-                        #     key_points[5][0])), 2, (0, 0, 255), -1)
-                        # Right eye
-                        # cv2.circle(frame, (int(key_points[1][0]), int(
-                        #     key_points[6][0])), 2, (0, 0, 255), -1)
-
-                        # cv2.circle(frame, (int(key_points[2][0]), int(
-                        #     key_points[7][0])), 2, (0, 0, 255), -1)
-                        # cv2.circle(frame, (int(key_points[3][0]), int(
-                        #     key_points[8][0])), 2, (0, 0, 255), -1)
-                        # cv2.circle(frame, (int(key_points[4][0]), int(
-                        #     key_points[9][0])), 2, (0, 0, 255), -1)
-                        if best_class_probabilities > 0.80:
-                            if faceNum != temp:
-                                temp = faceNum
-                                link_list = []
-                                for i in range(0, faceNum):
-                                    link_list.append([])
-                            print(len(link_list), '\n')
-                            print('i: ', i)
-                            link_list[i].append(
-                                [HumanNames[best_class_indices[0]], best_class_probabilities])
-                            link_list[i] = link_list[i][-node_size:]
-                            print(link_list)
-                            result_names = ""
-                            if AccuracyStatistics(link_list[i]) >= (node_size*(80/100)):
-                                result_names = HumanNames[best_class_indices[0]]
+                        if xmin >= a and xmax <= a*2:
+                            cropped.append(frame[ymin:ymax, xmin:xmax, :])
+                            cropped[i] = facenet.flip(cropped[i], False)
+                            scaled.append(np.array(Image.fromarray(
+                                cropped[i]).resize((image_size, image_size))))
+                            scaled[i] = cv2.resize(scaled[i], (input_image_size, input_image_size),
+                                                   interpolation=cv2.INTER_CUBIC)
+                            scaled[i] = facenet.prewhiten(scaled[i])
+                            scaled_reshape.append(
+                                scaled[i].reshape(-1, input_image_size, input_image_size, 3))
+                            feed_dict = {
+                                images_placeholder: scaled_reshape[i], phase_train_placeholder: False}
+                            emb_array[0, :] = sess.run(
+                                embeddings, feed_dict=feed_dict)
+                            predictions = model.predict_proba(emb_array)
+                            best_class_indices = np.argmax(predictions, axis=1)
+                            best_class_probabilities = predictions[np.arange(
+                                len(best_class_indices)), best_class_indices]
+                            fancy_draw(frame, bbox)
+                            #Distance_eyes from eyes to webcam
+                            left_eye = (key_points[0][0], key_points[5][0])
+                            right_eye = (key_points[1][0], key_points[6][0])
+                            w = Distance_eyes(left_eye, right_eye)
+                            W = 6.3 
+                            f = 636.6
+                            d = (W*f)/w #Distance_eyes from eyes to webcam
+                            # Left eye
+                            # cv2.circle(frame, (int(key_points[0][0]), int(
+                            #     key_points[5][0])), 2, (0, 0, 255), -1)
+                            # Right eye
+                            # cv2.circle(frame, (int(key_points[1][0]), int(
+                            #     key_points[6][0])), 2, (0, 0, 255), -1)
+    
+                            # cv2.circle(frame, (int(key_points[2][0]), int(
+                            #     key_points[7][0])), 2, (0, 0, 255), -1)
+                            # cv2.circle(frame, (int(key_points[3][0]), int(
+                            #     key_points[8][0])), 2, (0, 0, 255), -1)
+                            # cv2.circle(frame, (int(key_points[4][0]), int(
+                            #     key_points[9][0])), 2, (0, 0, 255), -1)
+                            if best_class_probabilities > 0.80:
+                                if faceNum != temp:
+                                    temp = faceNum
+                                    link_list = []
+                                    for i in range(0, faceNum):
+                                        link_list.append([])
+                                print(len(link_list), '\n')
+                                print('i: ', i)
+                                link_list[i].append(
+                                    [HumanNames[best_class_indices[0]], best_class_probabilities])
+                                link_list[i] = link_list[i][-node_size:]
+                                print(link_list)
+                                result_names = ""
+                                if AccuracyStatistics(link_list[i]) >= (node_size*(80/100)):
+                                    result_names = HumanNames[best_class_indices[0]]
+                                else:
+                                    result_names = "Unknown"
+                                cv2.rectangle(frame, (xmin, ymin - 30),
+                                              (xmax, ymin - 10), (0, 255, 0), -1)
+                                cv2.putText(frame, result_names + f' {int(d)}cm', (xmin, ymin - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                                            1, (0, 0, 0), thickness=1, lineType=1)
                             else:
-                                result_names = "Unknown"
-                            cv2.rectangle(frame, (xmin, ymin - 30),
-                                          (xmax, ymin - 10), (0, 255, 0), -1)
-                            cv2.putText(frame, result_names + f' {int(d)}cm', (xmin, ymin - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL,
-                                        1, (0, 0, 0), thickness=1, lineType=1)
+                                cv2.rectangle(frame, (xmin, ymin - 30),
+                                              (xmax, ymin - 10), (0, 255, 0), -1)
+                                cv2.putText(frame, "Unknown", (xmin, ymin - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                                            1, (0, 0, 0), thickness=1, lineType=1)
                         else:
-                            cv2.rectangle(frame, (xmin, ymin - 30),
-                                          (xmax, ymin - 10), (0, 255, 0), -1)
-                            cv2.putText(frame, "Unknown", (xmin, ymin - 12), cv2.FONT_HERSHEY_COMPLEX_SMALL,
-                                        1, (0, 0, 0), thickness=1, lineType=1)
+                            fancy_draw(frame, bbox)
                     except Exception as e:
                         print("Error: ", e)
             else:
